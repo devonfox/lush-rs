@@ -1,5 +1,10 @@
 use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
 use rand::Rng;
+use std::thread::spawn;
+use std::io::stdin;
+use std::sync::mpsc::*;
+use std::sync::mpsc::{Receiver, Sender};
+
 
 fn main() -> anyhow::Result<()> {
     // Find default output host
@@ -11,32 +16,50 @@ fn main() -> anyhow::Result<()> {
         .expect("failed to find output device");
     println!("Output device: {:?}", device.name()?); // print result
 
+    let end_chan: (Sender<()>, Receiver<()>) = channel();
+
     let config = device.default_output_config().unwrap();
     println!("Default output config: {:?}", config);
-
-    run::<f32>(&device, &config.into())
-    // Return result
-    // TODO: read up on anyhow crate
-    // Ok(())
-}
-
-pub fn run<T>(device: &cpal::Device, config: &cpal::StreamConfig) -> Result<(), anyhow::Error>
-where
-    T: cpal::Sample,
-{
-    let sample_rate = config.sample_rate.0 as f32;
-    let channels = config.channels as usize;
-
+    
     let keynumber: usize = rand::thread_rng().gen_range(20..84); // associated midi keynumber -> 60 == 'C4'
                                                                  // setting stage for midi callback to take a number to generate a tone
                                                                  // todo: use channels
 
-    let freq = { 440.0 * (2.0_f32).powf((keynumber as f32 - 69.0) / 12.0) };
+    let run_thread = spawn( move || { run::<f32>(&device, &config.into(), keynumber) });
+    let mut input = String::new();
+    let stdin = stdin();
+    input.clear();
+    match stdin.read_line(&mut input) {
+        Ok(_) => println!("Ending program..."),
+        Err(err) => println!("Error: {}", err),
+    
+    }; // wait for next enter key press to end program
+
+    match run_thread.join() {
+        Ok(_) => (),
+        Err(error) => println!("Error: {:?}", error)
+    };
+
+    // Return result
+    // TODO: read up on anyhow crate
+    Ok(())
+}
+
+pub fn run<T>(device: &cpal::Device, config: &cpal::StreamConfig, key: usize) -> Result<(), anyhow::Error>
+where
+    T: cpal::Sample,
+{
+    let sample_rate = config.sample_rate.0 as f32;
+    println!("Sample Rate: {}", sample_rate);
+    let channels = config.channels as usize;
+    println!("Channels: {}", channels);
+
+    let freq = { 440.0 * (2.0_f32).powf((key as f32 - 69.0) / 12.0) };
 
     let mut sample_clock = 0f32;
     let mut next_value = move || {
         sample_clock += 1.0;
-        if sample_clock % 4000.0 == 0.0 {
+        if sample_clock % 1000.0 == 0.0 {
             println!("{}", sample_clock);
         }
 
@@ -58,7 +81,6 @@ where
     )?;
     stream.play()?;
 
-    std::thread::sleep(std::time::Duration::from_millis(1000));
     Ok(())
 }
 
