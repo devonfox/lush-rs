@@ -14,6 +14,10 @@ Goal #1: A midi-enabled square synthesizer built in Rust using Cpal.
 ```anyhow = "1.0.58"```
 * clap
 ```clap = { version = "3.2.5", features = ["derive"] }```
+* wimidi
+```wmidi = "4.0.4"```
+* rand
+```rand = "0.8.3"```
 
 ### todo:
 
