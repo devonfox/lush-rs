@@ -1,6 +1,5 @@
 use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
-
-
+use rand::Rng;
 
 fn main() -> anyhow::Result<()> {
     // Find default output host
@@ -28,16 +27,16 @@ where
     let sample_rate = config.sample_rate.0 as f32;
     let channels = config.channels as usize;
 
-    let keynumber: usize = 60; // associated midi keynumber -> 60 == 'C4'
-    // setting stage for midi callback to take a number to generate a tone
-    // todo: use channels
+    let keynumber: usize = rand::thread_rng().gen_range(20..84); // associated midi keynumber -> 60 == 'C4'
+                                                                 // setting stage for midi callback to take a number to generate a tone
+                                                                 // todo: use channels
 
-    let freq = { 440.0 * (2.0 as f32).powf((keynumber as f32 - 69.0) / 12.0) };
+    let freq = { 440.0 * (2.0_f32).powf((keynumber as f32 - 69.0) / 12.0) };
 
     let mut sample_clock = 0f32;
     let mut next_value = move || {
-        sample_clock = (sample_clock + 1.0) % sample_rate;
-
+        sample_clock += 1.0;
+        // println!("Sample clock: {}", sample_clock);
         // Sine calc
         // (sample_clock * 440.0 * 2.0 * std::f32::consts::PI / sample_rate).sin()\
 
