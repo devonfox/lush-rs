@@ -1,5 +1,7 @@
 # lush-rs
 
+*Devon Fox 2022*
+
 Goal #1: A midi-enabled square synthesizer built in Rust using Cpal.
 
 ### Dependencies
