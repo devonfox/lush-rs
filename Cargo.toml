@@ -3,6 +3,10 @@ name = "lush-rs"
 version = "0.1.0"
 edition = "2021"
 
+[[bin]]
+name = "lush"
+path = "lush.rs"
+
 [dependencies]
 midir = "0.8.0"
 cpal = "0.13.5"
