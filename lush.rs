@@ -1,10 +1,9 @@
 use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
 use rand::Rng;
-use std::thread::spawn;
 use std::io::stdin;
 use std::sync::mpsc::*;
 use std::sync::mpsc::{Receiver, Sender};
-
+use std::thread::spawn;
 
 fn main() -> anyhow::Result<()> {
     // Find default output host
@@ -20,24 +19,23 @@ fn main() -> anyhow::Result<()> {
 
     let config = device.default_output_config().unwrap();
     println!("Default output config: {:?}", config);
-    
+
     let keynumber: usize = rand::thread_rng().gen_range(20..84); // associated midi keynumber -> 60 == 'C4'
                                                                  // setting stage for midi callback to take a number to generate a tone
                                                                  // todo: use channels
 
-    let run_thread = spawn( move || { run::<f32>(&device, &config.into(), keynumber) });
+    let run_thread = spawn(move || run::<f32>(&device, &config.into(), keynumber, end_chan.1));
     let mut input = String::new();
     let stdin = stdin();
     input.clear();
     match stdin.read_line(&mut input) {
         Ok(_) => println!("Ending program..."),
         Err(err) => println!("Error: {}", err),
-    
     }; // wait for next enter key press to end program
-
+    let _ = end_chan.0.send(());
     match run_thread.join() {
         Ok(_) => (),
-        Err(error) => println!("Error: {:?}", error)
+        Err(error) => println!("Error: {:?}", error),
     };
 
     // Return result
@@ -45,7 +43,12 @@ fn main() -> anyhow::Result<()> {
     Ok(())
 }
 
-pub fn run<T>(device: &cpal::Device, config: &cpal::StreamConfig, key: usize) -> Result<(), anyhow::Error>
+pub fn run<T>(
+    device: &cpal::Device,
+    config: &cpal::StreamConfig,
+    key: usize,
+    rx: Receiver<()>,
+) -> Result<(), anyhow::Error>
 where
     T: cpal::Sample,
 {
@@ -59,9 +62,9 @@ where
     let mut sample_clock = 0f32;
     let mut next_value = move || {
         sample_clock += 1.0;
-        if sample_clock % 1000.0 == 0.0 {
-            println!("{}", sample_clock);
-        }
+        // if sample_clock % 1000.0 == 0.0 {
+        //     println!("{}", sample_clock);
+        // }
 
         // Sine calc
         // (sample_clock * 440.0 * 2.0 * std::f32::consts::PI / sample_rate).sin()\
@@ -80,6 +83,7 @@ where
         err_fn,
     )?;
     stream.play()?;
+    let _ = rx.recv();
 
     Ok(())
 }
