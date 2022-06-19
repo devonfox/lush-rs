@@ -14,10 +14,10 @@ fn main() -> anyhow::Result<()> {
     let config = device.default_output_config().unwrap();
     println!("Default output config: {:?}", config);
 
-    run::<f32>(&device, &config.into())?;
+    run::<f32>(&device, &config.into())
     // Return result
     // TODO: read up on anyhow crate
-    Ok(())
+    // Ok(())
 }
 
 pub fn run<T>(device: &cpal::Device, config: &cpal::StreamConfig) -> Result<(), anyhow::Error>
@@ -36,17 +36,19 @@ where
     let mut sample_clock = 0f32;
     let mut next_value = move || {
         sample_clock += 1.0;
-        // println!("Sample clock: {}", sample_clock);
+        if sample_clock % 4000.0 == 0.0 {
+            println!("{}", sample_clock);
+        }
+
         // Sine calc
         // (sample_clock * 440.0 * 2.0 * std::f32::consts::PI / sample_rate).sin()\
 
         let square = 4.0 * (freq * sample_clock / sample_rate).floor()
             - 2.0 * (2.0 * freq * sample_clock / sample_rate).floor()
             + 1.0;
-        square * 0.5 // Currently half amplitude
+        square * 0.25 // Currently half amplitude
     };
     let err_fn = |err| eprintln!("an error occurred on stream: {}", err);
-
     let stream = device.build_output_stream(
         config,
         move |data: &mut [T], _: &cpal::OutputCallbackInfo| {
