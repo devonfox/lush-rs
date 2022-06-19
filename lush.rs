@@ -1,7 +1,6 @@
 use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
 use lush_rs::Key;
 use midir::{Ignore, MidiInput, MidiInputPort};
-use rand::Rng;
 use std::error::Error;
 use std::io::{stdin, stdout, Write};
 use std::sync::mpsc::*;
@@ -9,6 +8,7 @@ use std::sync::mpsc::{Receiver, Sender};
 use std::thread::spawn;
 use wmidi::MidiMessage;
 use wmidi::MidiMessage::*;
+use wmidi::Note;
 
 fn main() -> anyhow::Result<()> {
     // Find default output host
@@ -21,7 +21,7 @@ fn main() -> anyhow::Result<()> {
     println!("Output device: {:?}", device.name()?); // print result
 
     let end_chan: (Sender<()>, Receiver<()>) = channel(); // end channel
-    let note_chan: (Sender<Key>, Receiver<Key>) = channel(); // end channel
+    let note_chan: (Sender<Note>, Receiver<Note>) = channel(); // note channel
 
     let config = device.default_output_config().unwrap();
     println!("Default output config: {:?}", config);
@@ -68,20 +68,29 @@ fn main() -> anyhow::Result<()> {
             Err(err) => println!("Error: {}", err),
         },
     );
-
-    // let key: usize = rand::thread_rng().gen_range(20..84); // associated midi keynumber -> 60 == 'C4'
-    // setting stage for midi callback to take a number to generate a tone
-    // todo: use channels
+   
     // let note = Key {
     //     state: true,
     //     keynumber: key,
     // };
+     let mut notes: Vec<Key> = Vec::with_capacity(128);
 
+    for i in 0..128 {
+        let keys = Key {
+            state: false,
+            keynumber: i,
+            sample_clock: 0.0,
+        };
+        notes.push(keys);
+    }
+
+    // println!("{:?}", notes);
     let note = note_chan.1.recv()?;
-    println!("{:?}", note);
-
+    // println!("{:?}", note as usize);
+    notes[note as usize].state = true;
+    
     // Sending single note to thread to play until keypress is accepted in CLI
-    let run_thread = spawn(move || run::<f32>(&device, &config.into(), note, end_chan.1));
+    let run_thread = spawn(move || run::<f32>(&device, &config.into(), notes, end_chan.1));
 
     let mut input = String::new();
     let stdin = stdin();
@@ -107,7 +116,7 @@ fn main() -> anyhow::Result<()> {
 pub fn run<T>(
     device: &cpal::Device,
     config: &cpal::StreamConfig,
-    note: Key,
+    notes: Vec<Key>,
     rx: Receiver<()>,
 ) -> Result<(), anyhow::Error>
 where
@@ -117,8 +126,17 @@ where
     println!("Sample Rate: {}", sample_rate);
     let channels = config.channels as usize;
     println!("Channels: {}", channels);
+    let mut current = 0_usize;
+    for note in notes {
+        if note.state {
+            current = note.keynumber;
+            break;
+        }
+    }
 
-    let freq = { 440.0 * (2.0_f32).powf((note.keynumber as f32 - 69.0) / 12.0) };
+    let freq = { 440.0 * (2.0_f32).powf((current as f32 - 69.0) / 12.0) };
+
+    // let freq = note.to_freq_f32();
 
     let mut sample_clock = 0f32;
     let mut next_value = move || {
@@ -164,21 +182,18 @@ pub fn read(
     in_port_name: &str,
     in_port: MidiInputPort,
     midi_in: MidiInput,
-    tx: Sender<Key>,
+    tx: Sender<Note>,
 ) -> Result<(), Box<dyn Error>> {
     println!("\nOpening input connection");
-    let input_connection = midi_in.connect(
+    let _input_connection = midi_in.connect(
         &in_port,
         "midir-read-input",
         move |_, message, _| {
             //println!("{:?} (len = {})", message, message.len());
             let message = MidiMessage::try_from(message).unwrap(); //unwrapping message slice
             if let NoteOn(_, note, _) = message {
-                let newkey = Key {
-                    state: true,
-                    keynumber: note as usize,
-                };
-                let _ = tx.send(newkey); // sending note value through channel
+                
+                let _ = tx.send(note); // sending note value through channel
             }
         },
         (),
@@ -192,7 +207,7 @@ pub fn read(
     loop {
         // fix ending condition later once note structure is set up
     }
-    input_connection.close();
-    println!("Closing input connection");
+    // _input_connection.close();
+    // println!("Closing input connection");
     Ok(())
 }
