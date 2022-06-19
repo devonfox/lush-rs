@@ -1,5 +1,7 @@
 use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
 
+
+
 fn main() -> anyhow::Result<()> {
     // Find default output host
     let host = cpal::default_host();
@@ -22,18 +24,27 @@ fn main() -> anyhow::Result<()> {
 pub fn run<T>(device: &cpal::Device, config: &cpal::StreamConfig) -> Result<(), anyhow::Error>
 where
     T: cpal::Sample,
-{   
+{
     let sample_rate = config.sample_rate.0 as f32;
     let channels = config.channels as usize;
 
+    let keynumber: usize = 60; // associated midi keynumber -> 60 == 'C4'
+    // setting stage for midi callback to take a number to generate a tone
+    // todo: use channels
+
+    let freq = { 440.0 * (2.0 as f32).powf((keynumber as f32 - 69.0) / 12.0) };
 
     let mut sample_clock = 0f32;
     let mut next_value = move || {
         sample_clock = (sample_clock + 1.0) % sample_rate;
-        // (sample_clock * 440.0 * 2.0 * std::f32::consts::PI / sample_rate).sin()
-        let square =
-            4.0 * (440.0 * sample_clock / sample_rate).floor() - 2.0 * (2.0 * 440.0 * sample_clock / sample_rate).floor() + 1.0;
-        square * 0.5
+
+        // Sine calc
+        // (sample_clock * 440.0 * 2.0 * std::f32::consts::PI / sample_rate).sin()\
+
+        let square = 4.0 * (freq * sample_clock / sample_rate).floor()
+            - 2.0 * (2.0 * freq * sample_clock / sample_rate).floor()
+            + 1.0;
+        square * 0.5 // Currently half amplitude
     };
     let err_fn = |err| eprintln!("an error occurred on stream: {}", err);
 
