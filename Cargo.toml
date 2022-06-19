@@ -6,3 +6,5 @@ edition = "2021"
 [dependencies]
 midir = "0.8.0"
 cpal = "0.13.5"
+clap = { version = "3.2.5", features = ["derive"] }
+anyhow = "1.0.58"
