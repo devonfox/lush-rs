@@ -6,6 +6,7 @@ use std::io::{stdin, stdout, Write};
 use std::sync::mpsc::*;
 use std::sync::mpsc::{Receiver, Sender};
 use std::thread::spawn;
+use std::time::Duration;
 use wmidi::MidiMessage;
 use wmidi::MidiMessage::*;
 use wmidi::Note;
@@ -32,9 +33,7 @@ fn main() -> anyhow::Result<()> {
     let in_port = match in_ports.len() {
         0 => {
             println!("Error: No input connection found. Press enter to quit.");
-            let error = Err("closing connections.").unwrap();
-            //
-            error
+            Err("closing connections.").unwrap()
         }
         1 => {
             println!(
@@ -116,7 +115,7 @@ fn main() -> anyhow::Result<()> {
 pub fn run<T>(
     device: &cpal::Device,
     config: &cpal::StreamConfig,
-    notes: Vec<Key>,
+    mut notes: Vec<Key>,
     rx: Receiver<()>,
 ) -> Result<(), anyhow::Error>
 where
@@ -127,10 +126,11 @@ where
     let channels = config.channels as usize;
     println!("Channels: {}", channels);
     let mut current = 0_usize;
-    for note in notes {
+    for note in &notes {
         if note.state {
             current = note.keynumber;
-            break;
+            break; // here we need assign the note to a different state
+                   // and also add a note on or off to the setting
         }
     }
 
@@ -138,15 +138,15 @@ where
 
     // let freq = note.to_freq_f32();
 
-    let mut sample_clock = 0f32;
+    // let mut sample_clock = 0f32;
     let mut next_value = move || {
-        sample_clock += 1.0;
+        notes[current].sample_clock += 1.0;
 
         // Sine calc
         // (sample_clock * 440.0 * 2.0 * std::f32::consts::PI / sample_rate).sin()\
 
-        let square = 4.0 * (freq * sample_clock / sample_rate).floor()
-            - 2.0 * (2.0 * freq * sample_clock / sample_rate).floor()
+        let square = 4.0 * (freq * notes[current].sample_clock / sample_rate).floor()
+            - 2.0 * (2.0 * freq * notes[current].sample_clock / sample_rate).floor()
             + 1.0;
         square * 0.55 // Currently half amplitude
     };
@@ -206,6 +206,7 @@ pub fn read(
 
     loop {
         // fix ending condition later once note structure is set up
+        std::thread::sleep(Duration::from_millis(50));
     }
     // _input_connection.close();
     // println!("Closing input connection");
